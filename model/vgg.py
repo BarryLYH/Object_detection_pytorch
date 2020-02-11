@@ -1,8 +1,10 @@
 import torch
-improt torch.nn as nn
-
+import torch.nn as nn
+import torch.nn.functional as F
 
 __all__ = ["vgg16"]
+
+        
 
 class VGG16(nn.Module):
     def __init__(self, class_num = 80):
@@ -92,7 +94,7 @@ class VGG16(nn.Module):
         x = self.conv2(x)
         x = self.conv3(x)
         x = self.conv4_3(x)
-        features.append(x)
+        features.append(F.normalizex(x, p=2, dim=1, eps=1e-12)) #L2normalization in torch
         x = self.maxpool4(x)
         x = self.conv5(x)
         x = self.conv6(x)

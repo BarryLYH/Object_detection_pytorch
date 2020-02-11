@@ -138,7 +138,7 @@ class VGG16(nn.Module):
             nn.Conv2d(128, 256, 3, 1), #1*1*256, here is feature6
             nn.ReLU(inplace=True)
         )
-        self.prediction = self.
+
 
     def forward(self, x):
         features = []

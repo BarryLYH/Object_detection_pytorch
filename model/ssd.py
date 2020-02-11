@@ -5,18 +5,31 @@ from vgg16 import *
 
 
 class SSD(nn.Module):
-    def __init__(self, class_num = 80):
+    def __init__(self, cfg, class_num = 80):
         super(SSD, self).__init__()
         # Here asume the input size of image is 300*300*3
-        self.vgg = vgg16(class_num = class_num)
+        self.backbone = vgg16(class_num = class_num)
+        self.predict = predict(cfg)        
+
 
     def forward(self, x):
-        features = self.vgg(x)
+        features = self.backbone(x)
+        
+
+
+class Predict(nn.Module):
+    def __init__(self, class_num = 80):
+        
+
+    def forward(self, features):
+        return         
         
 
     def predict(self, features, ):
-        f1, f2, f3, f4, f5, f6 = features 
-               
+        f1, f2, f3, f4, f5, f6 = features
+        
+    def 
+        
         
         
     def classifier(self, in_depth, class_num, anchor_num):
@@ -32,4 +45,15 @@ class SSD(nn.Module):
             nn.ReLU(input=True)
         )
         return layers
+
+cfg = [[4, 1024], [],6,6,]
+
+def ssd(**kwarg):
+    model = SSD(**kwarg)
+    return model
+
+def predict():
+    model = Predict()
+    return model
+    
 

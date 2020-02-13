@@ -53,6 +53,7 @@ class AnchorBox(Object):
 class Detector(Object):
     def __init__(self, class_num):
         self.threshold = 0.5
+        self.top_k = 100
         self.class_num = class_num
         
 
@@ -60,13 +61,9 @@ class Detector(Object):
         # loc: the prediction of locations [batch_size, anchor_num, 4] which is [batch_size, 8732, 4]
         # cls_conf: the preidction of class confidence [batch_size, anchor_num, class_num] which is [batch_size, 8732, 81]
         # anchors: the default boxes [8732, 4]        
-
-
         batch_size = loc.size(0)
         #reorder cls_conf to [batch_size, class_num, anchor_num]
-        cls_pred = cls_conf.permute(0,2,1)   
-
-
+        cls_pred = cls_conf.permute(0,2,1)  
         for i in range(batch_size):
             decoded_box = decode(loc[i], anchors, self.variance)# [8732, 2]
             cls_scores = cls_conf[i].clone #class confidence of each box in image i, [81, 8732]
@@ -86,21 +83,56 @@ class Detector(Object):
                 boxes = decoded_box[loc_mask].view(-1, 4) 
                 
                 #left = torchvision.ops.nms(boxes, scores, nms_threshold)
-        
+                b, s = nms(boxes, scores, self.threshold, self.top_k)
+
+            
                                   
-              
-
 def decode(loc, anchors, variance):
+    #loc: [8732, 4] , the 4 here is the bias rate of anchor box.
+    #     so that we use "decode" to transfer bias to predicted box
+    #anchors: [8732, 4]
+    #variance: in paper, this is the manual set variance to decode
+    boxes = torch.cat(
+            (anchors[:, :2] + anchors[:, 2:] * loc[:, :2]* variance[0],
+             anchors[:, 2:] * torch.exp(loc[:, 2:] * variance[1]))  ,1)
+    # transfer box from (cx, cy w, h) to (xmin, ymin, xmax, ymax)
+    boxes[:, :2] = boxes[:, :2] - boxes[:, 2:] / 2
+    boxes[:, 2:] = boxes[:, :2] + boxes[:, 2:]
+    return boxes
 
-def nms(boxes, scores):
+def nms(boxes, scores, threshold, top_k):
+    # implement non-maxmium suppression to avoid too many overlapping
+    # bounding box
+    # boxes: [boxes_num, 4]
+    # scores: [boxes_num]
+    # threshold: IOU threshold 
+    keep = []
+    if scores.size(0) == 0: return keep
+    x1 = boxes[:, 0]
+    y1 = boxes[:, 1]
+    x2 = boxes[:, 2]
+    y2 = boxes[:, 3]
+    area  = (x2 - x1) * (y2 - y1)
+    _, order = scroes.sort(0)
+    while order.size(0) > 0:
+        if order.size(0) == 1:
+            i = order.item()
+            keep.append(i)
+            break
+        else:
+            i = order[0].item()
+            keep.append(i)
+        xx1 = x1[order[1:]].clamp(min = x1[i])
+        yy1 = y1[order[1:]].clamp(min = y1[i])
+        xx2 = x2[order[1:]].clamp(max = x2[i])
+        yy2 = y2[order[1:]].clamp(max = y2[i])
+        overlap = (xx2-xx1).clamp(min=0) * (yy2- yy1).clamp(min=0)
+        iou = overlap / (area[i] + area[order[1:]]-overlap)
+        iou_mask = iou.le(threshold)
+        order = order[1:][iou_mask] # [len(order-1)]
 
-
-
-
-
-
-
-             
-
-
-
+    if len(keep) > top_k:
+        keep = keep[:top_k]
+    output_boxes = boxes[keep[:]]
+    output_scores = scores[keep[:]]
+    return output_boxes, output_scores

@@ -56,7 +56,6 @@ class Detector(Object):
         self.top_k = 100
         self.class_num = class_num
         
-
     def forward(self, loc, cls_conf, anchors):
         # loc: the prediction of locations [batch_size, anchor_num, 4] which is [batch_size, 8732, 4]
         # cls_conf: the preidction of class confidence [batch_size, anchor_num, class_num] which is [batch_size, 8732, 81]
@@ -84,9 +83,8 @@ class Detector(Object):
                 
                 #left = torchvision.ops.nms(boxes, scores, nms_threshold)
                 b, s = nms(boxes, scores, self.threshold, self.top_k)
-
-            
-                                  
+                
+                        
 def decode(loc, anchors, variance):
     #loc: [8732, 4] , the 4 here is the bias rate of anchor box.
     #     so that we use "decode" to transfer bias to predicted box
@@ -108,14 +106,14 @@ def nms(boxes, scores, threshold, top_k):
     # threshold: IOU threshold 
     keep = []
     if scores.size(0) == 0: return keep
-    x1 = boxes[:, 0]
-    y1 = boxes[:, 1]
-    x2 = boxes[:, 2]
-    y2 = boxes[:, 3]
-    area  = (x2 - x1) * (y2 - y1)
-    _, order = scroes.sort(0)
+    x1 = boxes[:, 0] #[8732], right_up corner x of box
+    y1 = boxes[:, 1] #[8732], right_up corner y of box
+    x2 = boxes[:, 2] #[8732], left_down corner x of box
+    y2 = boxes[:, 3] #[8732], left_down corner y of box
+    area  = (x2 - x1) * (y2 - y1) # area of each box
+    _, order = scroes.sort(0) # order: [8732], the index of elements in scores following descending order
     while order.size(0) > 0:
-        if order.size(0) == 1:
+        if order.size(0) == 1: #only one box left
             i = order.item()
             keep.append(i)
             break
@@ -130,6 +128,9 @@ def nms(boxes, scores, threshold, top_k):
         iou = overlap / (area[i] + area[order[1:]]-overlap)
         iou_mask = iou.le(threshold)
         order = order[1:][iou_mask] # [len(order-1)]
+        if order.size(0) == 0:
+            # all the left boxes are over iou_threshold, no box left
+            break
 
     if len(keep) > top_k:
         keep = keep[:top_k]

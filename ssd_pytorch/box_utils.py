@@ -71,7 +71,7 @@ class Detector(Object):
             cls_scores = cls_conf[i].clone #class confidence of each box in image i, [81, 8732]
             
             for j in range(1, class_num):# j =0 is the background confidence
-                cls_j = torch.Tensor
+        #TODO        cls_j = torch.Tensor
                 # cls_score[j] is size [8732], cls_mask is also a tenor with False or Ture in size 8732
                 # which mean the box of image_i, have class_i score over threshold 
                 cls_mask = torch.gt(cls_scores[j], self.threshold)
@@ -90,7 +90,9 @@ class Detector(Object):
                 #s shape: [nms_scores, 1]
                 b, s = nms(boxes, scores, self.threshold, self.top_k)
                 score_bbox = torch.cat((s.unsqueeze(1), b), 1) # shape [nms_box, 5]
-                
+                score_bbox = score_bbox.unsqueeze(0) # shape [1, nms_box, 5]
+           #TODO     cls_scores = torch.cat((cls_scores, score_bbox), 0)
+            
 
                         
 def decode(loc, anchors, variance):

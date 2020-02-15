@@ -63,11 +63,15 @@ class Detector(Object):
         batch_size = loc.size(0)
         #reorder cls_conf to [batch_size, class_num, anchor_num]
         cls_pred = cls_conf.permute(0,2,1)  
+
+        output = torch.Tenor([])
         for i in range(batch_size):
+            image_i = torch.Tensor([])
             decoded_box = decode(loc[i], anchors, self.variance)# [8732, 2]
             cls_scores = cls_conf[i].clone #class confidence of each box in image i, [81, 8732]
-
+            
             for j in range(1, class_num):# j =0 is the background confidence
+                cls_j = torch.Tensor
                 # cls_score[j] is size [8732], cls_mask is also a tenor with False or Ture in size 8732
                 # which mean the box of image_i, have class_i score over threshold 
                 cls_mask = torch.gt(cls_scores[j], self.threshold)
@@ -82,8 +86,12 @@ class Detector(Object):
                 boxes = decoded_box[loc_mask].view(-1, 4) 
                 
                 #left = torchvision.ops.nms(boxes, scores, nms_threshold)
+                #b shape: [nms_box, 4]
+                #s shape: [nms_scores, 1]
                 b, s = nms(boxes, scores, self.threshold, self.top_k)
+                score_bbox = torch.cat((s.unsqueeze(1), b), 1) # shape [nms_box, 5]
                 
+
                         
 def decode(loc, anchors, variance):
     #loc: [8732, 4] , the 4 here is the bias rate of anchor box.
@@ -131,7 +139,7 @@ def nms(boxes, scores, threshold, top_k):
         if order.size(0) == 0:
             # all the left boxes are over iou_threshold, no box left
             break
-
+    
     if len(keep) > top_k:
         keep = keep[:top_k]
     output_boxes = boxes[keep[:]]

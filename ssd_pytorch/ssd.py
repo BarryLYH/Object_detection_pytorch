@@ -7,9 +7,11 @@ class SSD(nn.Module):
     def __init__(self, phase = "train",class_num = 80):
         super(SSD, self).__init__()
         # Here asume the input size of image is 300*300*3
+        self.phase = phase 
         self.class_num = class_num
         self.backbone = VGG16(class_num = self.class_num)#output of this layer are 6 features
         self.predict = Predict(phase=self.phase, class_num = self.class_num)
+        
 
     def forward(self, x):
         features = self.backbone(x)
@@ -27,6 +29,7 @@ class Predict(nn.Module):
         self.anchors = [4, 6, 6, 6, 4, 4]
         self.class_num = class_num + 1
         self.phase = phase
+        self.softmax = nn.Softmax(-1)
 
     def forward(self, features):
         loc = []
@@ -56,6 +59,10 @@ class Predict(nn.Module):
         # which are (batch_size, 8732, 4) and (batch_size, 8732, 81)
         loc = loc.view(loc.size(0), -1, 4)
         cls = cls.view(cls.size(0), -1, self.class_num)
+        
+        if self.phase == "test":
+            cls = self.softmax(cls)            
+
         return loc, cls
 
 class VGG16(nn.Module):

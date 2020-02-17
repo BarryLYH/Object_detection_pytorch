@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-
+import numpy as np
 
 class AnchorBox(Object):
     def __init__(self):
@@ -31,17 +31,17 @@ class AnchorBox(Object):
                     s_k = self.min_size[k] / self.image_size        
                     anchors += [cx, cy, s_k, s_k]
                     # the large square
-                    s_k_prime = sqrt(s_k * (self.max_size[k] / self.image_size ))
+                    s_k_prime = np.sqrt(s_k * (self.max_size[k] / self.image_size ))
                     anchors += [cx, cy, s_k_prime, s_k_prime]
                     # w:h = 1:2 or 2:1 trangles
-                    s_k2_h = s_k / sqrt(2)
-                    s_k2_w = s_k * sqrt(2)
+                    s_k2_h = s_k / np.sqrt(2)
+                    s_k2_w = s_k * np.sqrt(2)
                     anchors += [cx, cy, s_k2_h, s_k2_w]
                     anchors += [cx, cy, s_k2_w, s_k2_h]
                     # when there are 6 anchor boxes, we need w:h=1:3 and 3:1 trangles
                     if self.anchor_num == 6:
-                        s_k3_h = s_k / sqrt(3)
-                        s_k3_w = s_k * sqrt(3)
+                        s_k3_h = s_k / np.sqrt(3)
+                        s_k3_w = s_k * np.sqrt(3)
                         anchors += [cx, cy, s_k3_h, s_k3_w]
                         anchors += [cx, cy, s_k3_w, s_k3_h]
         #turn list in to tensor and resize it in (anchor_num, 4), here is (8732, 4)
@@ -63,37 +63,38 @@ class Detector(Object):
         batch_size = loc.size(0)
         #reorder cls_conf to [batch_size, class_num, anchor_num]
         cls_pred = cls_conf.permute(0,2,1)  
-
         output = torch.Tenor([])
+
         for i in range(batch_size):
             image_i = torch.Tensor([])
             decoded_box = decode(loc[i], anchors, self.variance)# [8732, 2]
             cls_scores = cls_conf[i].clone #class confidence of each box in image i, [81, 8732]
-            
+            cls_output = torch.zeros(self.class_num, self.top_k ,5)
             for j in range(1, class_num):# j =0 is the background confidence
-        #TODO        cls_j = torch.Tensor
                 # cls_score[j] is size [8732], cls_mask is also a tenor with False or Ture in size 8732
                 # which mean the box of image_i, have class_i score over threshold 
                 cls_mask = torch.gt(cls_scores[j], self.threshold)
                 # get all the score which is larger than threshold, in order to to nms next
-                scores = cls_scores[j][cls_mask] 
-                
+                scores = cls_scores[j][cls_mask]
                 if scores.dim() == 0: continue
                 #the size of decoded_box is [8732, 4], cls_mask.unsqueeze(1), make is [8732, 1]. However, it is still 
                 # not the same as decoded_box, so we need to .expand_as(decoded_box), loc_mask is [8732, 4]
                 # which is, for exmaple, [[True, True, True, True], [False, False, False, False]....] 
                 loc_mask = cls_mask.unsqueeze(1).expand_as(decoded_box)
                 boxes = decoded_box[loc_mask].view(-1, 4) 
-                
                 #left = torchvision.ops.nms(boxes, scores, nms_threshold)
                 #b shape: [nms_box, 4]
                 #s shape: [nms_scores, 1]
                 b, s = nms(boxes, scores, self.threshold, self.top_k)
                 score_bbox = torch.cat((s.unsqueeze(1), b), 1) # shape [nms_box, 5]
-                score_bbox = score_bbox.unsqueeze(0) # shape [1, nms_box, 5]
-           #TODO     cls_scores = torch.cat((cls_scores, score_bbox), 0)
-            
-
+                length = score_bbox.size(0) #number of nms_box, length<=top_k
+                cls_output[j, :length]= score_bbox
+            # The shape of cls_output is [class_num, top_k, 5] now
+            cls_output = cls_output.unsqueeze(0) # cls_output [1, class_num, final_boxes_num, 5]
+            # Concatenate result of  image_j to output
+            output = torch.cat((output, cls_output), 0)
+        # output shape [batch_size, class_num, top_k, 5(score+box)]
+        return output
                         
 def decode(loc, anchors, variance):
     #loc: [8732, 4] , the 4 here is the bias rate of anchor box.
@@ -121,7 +122,7 @@ def nms(boxes, scores, threshold, top_k):
     x2 = boxes[:, 2] #[8732], left_down corner x of box
     y2 = boxes[:, 3] #[8732], left_down corner y of box
     area  = (x2 - x1) * (y2 - y1) # area of each box
-    _, order = scroes.sort(0) # order: [8732], the index of elements in scores following descending order
+    _, order = scores.sort(0) # order: [8732], the index of elements in scores following descending order
     while order.size(0) > 0:
         if order.size(0) == 1: #only one box left
             i = order.item()

@@ -142,7 +142,6 @@ def nms(boxes, scores, threshold, top_k):
         if order.size(0) == 0:
             # all the left boxes are over iou_threshold, no box left
             break
-    
     if len(keep) > top_k:
         keep = keep[:top_k]
     output_boxes = boxes[keep[:]]

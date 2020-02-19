@@ -48,6 +48,9 @@ def box_match(thres, variance, box_gt, cls_gt, anchors, loc_t, cls_t, idx):
     # tranfer anchors from [cx,cy, w,h] to 4 points [xmin, ymin, xmax, ymax]
     anchors_4p = torch.cat((anchors[:, :2]-anchors[:,2:]/2, anchors[:,:2]+anchors[:,2:]/2) ,1)
     overlap = iou_jaccard(box_gt, anchors_4p)
+    
+
+
 
 def iou_jaccard(box_t, box_a):
     '''
@@ -61,10 +64,16 @@ def iou_jaccard(box_t, box_a):
            box_t[:,:2].unsqueeze(1).expand(len_t, len_a, 2),
            box_a[:,:2].unsqueeze(0).expand(len_t, len_a, 2)
     ) 
-    xy_max = torch.max(
-           box_t[:,:2].unsqueeze(1).expand(len_t, len_a, 2),
-           box_a[:,:2].unsqueeze(0).expand(len_t, len_a, 2)
-    ) 
+    xy_max = torch.min(
+           box_t[:,2:].unsqueeze(1).expand(len_t, len_a, 2),
+           box_a[:,2:].unsqueeze(0).expand(len_t, len_a, 2)
+    )
+    #get the width and height of the overlap areas
+    box_wh = torch.clamp((xy_max-xy_min), min = 0) # [object_num, anchor_num, 2]
+    iou = torch.zeros(len_t, len_a)
+    # calculate iou overlap area
+    iou[:,:] = box_wh[:,:,0] * box_wh[:,:,1] #[object_num, anchor_num]
+    return iou
 
 def encode():
 

@@ -45,7 +45,26 @@ def box_match(thres, variance, box_gt, cls_gt, anchors, loc_t, cls_t, idx):
     loc_t: [batch_size, anchors_num, 4](batch, 8732, 4) the output of match boxes location info
     cls_t: [batch_size, anchors_num](batc, 8732) the output of match boxes class
     idx: image index in batch_size of images"""
-    
+    # tranfer anchors from [cx,cy, w,h] to 4 points [xmin, ymin, xmax, ymax]
+    anchors_4p = torch.cat((anchors[:, :2]-anchors[:,2:]/2, anchors[:,:2]+anchors[:,2:]/2) ,1)
+    overlap = iou_jaccard(box_gt, anchors_4p)
+
+def iou_jaccard(box_t, box_a):
+    '''
+    box_t: [object_num, 4]
+    box_a: [anchor_num, 4] is [8732, 4]
+    return [object_num, anchor_num] the iou of object_box to every anchor_box
+    '''
+    len_t = box_t.size(0)
+    len_a = box_a.size(0)
+    xy_min = torch.max(
+           box_t[:,:2].unsqueeze(1).expand(len_t, len_a, 2),
+           box_a[:,:2].unsqueeze(0).expand(len_t, len_a, 2)
+    ) 
+    xy_max = torch.max(
+           box_t[:,:2].unsqueeze(1).expand(len_t, len_a, 2),
+           box_a[:,:2].unsqueeze(0).expand(len_t, len_a, 2)
+    ) 
 
 def encode():
 

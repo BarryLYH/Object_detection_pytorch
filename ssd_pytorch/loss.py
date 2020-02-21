@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 __all__ = []
 
@@ -31,8 +32,28 @@ class MultiBoxLoss(nn.Module):
             box_gt = gt[idx][:,:-1].data #[object_num, 4]
             cls_gt = gt[idx][:,-1].data  #[object_num]
             default_anchors = anchors.data
-            # loc_t, cls_t will change inside "box_matcg"
+            # loc_t, cls_t will change inside "box_match"
             box_match(self.iou_threshold, self.variance, box_gt, cls_gt, default_anchors, loc_t, cls_t, idx) 
+        if self.use_gpu:
+            loc_t.cuda()
+            cls_t.cuda()
+        loc_t = Variable(loc_t, requires_grad=False)
+        cls_t = Variable(cls_t, requires_grad=False)
+        #find anchors whose classes are not background
+        #cls_mask: [batch_size, anchor_num]
+        cls_mask = (cls_t > 0) 
+
+        # location loss function, use smoothL1 loss function
+        # loc_t, loc: [batch_size, anchor_num ,4]
+        # cls_mask:   [batch_size, anchor_num]
+        box_mask = cls_mask.unsqueeze(1).expand(batch_size, anchor_num, 4)
+        loc_p = loc[box_mask].view(-1, 4) 
+        loc_gt = loc_t[box_mask].view(-1, 4)
+        loss_l = F.smooth_l1_loss(loc_p, loc_gt, reduction='mean')
+
+        # class confidence loss function, crossentrypy
+        #
+
 
 
 def box_match(thres, variance, box_gt, cls_gt, anchors, loc_t, cls_t, idx):

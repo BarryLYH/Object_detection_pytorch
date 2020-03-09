@@ -16,7 +16,7 @@ class MultiBoxLoss(nn.Module):
     def forward(self, predictions, gt):
         #predictions = [loc, cls_conf, anchors]
         #loc:  output from SSD [batch_size, anchor_number, 4] ([batch_size, 8732, 4])
-        #cls_conf: [batch_size,anchor_number, class_num] (batch_size, 8732, 21)
+        #cls_conf: [batch_size, anchor_number, class_num] (batch_size, 8732, 21)
         #anchors: [8732, 4]
         #gt: ground truth, the location info of groud truth [batch_size, object_num, 5]
         #    "object_num" is the number of objects in a image. "5" mean 4 loaction info + 1 class
@@ -52,7 +52,11 @@ class MultiBoxLoss(nn.Module):
         loss_l = F.smooth_l1_loss(loc_p, loc_gt, reduction='mean')
 
         # class confidence loss function, crossentrypy
-        #
+        # conf_data: [batch, num_priors, num_classes]
+        # batch_conf: [batch, num_priors, num_classes]
+        
+
+        
 
 
 
@@ -123,7 +127,9 @@ def iou_jaccard(box_t, box_a):
     overlap[:,:] = box_wh[:,:,0] * box_wh[:,:,1] #[object_num, anchor_num]
 
     #TODO iou = 
-
+    area_t = (box_t[:,2] - box_t[:,0]) * (box_t[:,3] - box_t[:,1]).unsqueeze(1).expand(overlap)
+    area_a = (box_a[:,2] - box_a[:,0]) * (box_a[:,3] - box_a[:,1]).unsqueeze(0).expand(overlap)
+    iou = overlap / (area_t + area_a - overlap)
     return iou
 
 def encode(bow_match, anchors, variance):

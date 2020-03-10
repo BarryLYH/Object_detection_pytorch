@@ -2,16 +2,17 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-__all__ = []
+#__all__ = []
 
 class MultiBoxLoss(nn.Module):
-    def __init__(self, use_gpu, iou_threshold, variance,class_num):
+    def __init__(self, use_gpu, iou_threshold, variance,class_num, negpos_ratio):
         super(MultiBoxLoss, self).__init__()
         self.use_gpu = use_gpu
         self.class_num = class_num
         self.iou_threshold = iou_threshold 
         self.bg_label = 0 #in class predictions, index=0 is the confidence for background
         self.variance = variance
+        self.negpos_ratio = negpos_ratio # the ratio of negative_sample/positive_sample
 
     def forward(self, predictions, gt):
         #predictions = [loc, cls_conf, anchors]
@@ -32,7 +33,7 @@ class MultiBoxLoss(nn.Module):
             box_gt = gt[idx][:,:-1].data #[object_num, 4]
             cls_gt = gt[idx][:,-1].data  #[object_num]
             default_anchors = anchors.data
-            # loc_t, cls_t will change inside "box_match"
+            # loc_t, cls_t will change inside "box_match()"
             box_match(self.iou_threshold, self.variance, box_gt, cls_gt, default_anchors, loc_t, cls_t, idx) 
         if self.use_gpu:
             loc_t.cuda()
@@ -40,25 +41,49 @@ class MultiBoxLoss(nn.Module):
         loc_t = Variable(loc_t, requires_grad=False)
         cls_t = Variable(cls_t, requires_grad=False)
         #find anchors whose classes are not background
-        #cls_mask: [batch_size, anchor_num]
-        cls_mask = (cls_t > 0) 
+        #cls_pos: the positive samples [batch_size, anchor_num]
+        cls_pos = (cls_t > 0) 
 
         # location loss function, use smoothL1 loss function
         # loc_t, loc: [batch_size, anchor_num ,4]
-        # cls_mask:   [batch_size, anchor_num]
-        box_mask = cls_mask.unsqueeze(1).expand(batch_size, anchor_num, 4)
+        # cls_pos:   [batch_size, anchor_num]
+        box_mask = cls_pos.unsqueeze(1).expand(batch_size, anchor_num, 4)
         loc_p = loc[box_mask].view(-1, 4) 
         loc_gt = loc_t[box_mask].view(-1, 4)
         loss_l = F.smooth_l1_loss(loc_p, loc_gt, reduction='mean')
 
         # class confidence loss function, crossentrypy
-        # conf_data: [batch, num_priors, num_classes]
-        # batch_conf: [batch, num_priors, num_classes]
-        
+        # cls_conf: [batch, num_priors, num_classes]
+        # cls_t: [batch, num_priors]
+        cls_conf = cls_conf.view(-1, self.class_num) # (batch*8732, 21)
+        # Do log(softmax([num_classes]))
+        cls_log = -torch.log(F.softmax(1, cls_conf)) 
+        # the prediction loss of anchor box. We get the prediction log(softmax)
+        # of the expected class. This class's probability should be 1, after log(1)
+        # it should be 0. so the distance is 0 - log(softmax[])
+        cls_b_loss = torch.gather(cls_log, 1, cls_t.view(-1, 1))
+        #mine the negative samples
+        cls_b_loss[cls_pos.view(-1, 1)] = 0 # we turn all the positve samples' losses to 0
+        cls_b_loss = cls_b_loss.view(batch_size, -1) # [batch*anchor, 1] -> [batch, anchors]
+        #after these two sort, neg_index will be the index of each element in descending order
+        #for example, [2,3,4,1] the descending order should be [4,3,2,1]and the neg_index
+        # will be [2,1,0,4] (4 is largest, so in decsending order the index is 0)
+        _, loss_index = cls_b_loss.sort(1, descending=True) #[batch_size, anchor_num]
+        _, neg_index = loss_index.sort(1) #[batch_size, anchor_num]
+        pos_num = cls_pos.long().sum(1, keepdim=True) #[batch_size, 1]
+        neg_num = torch.clamp(self.negpos_ratio*pos_num, max=cls_pos.size(1)-1)#[batch_size, 1]
+        cls_neg = neg_index < neg_num.expand_as(neg_index)  #[batch_size,anchor_num]
 
-        
-
-
+        cls_pos_expand = cls_pos.unsquence(2).expand_as(cls_conf) #(batch, anchor_num, class_num) Ture or False inside
+        cls_neg_expand = cls_neg.unsquence(2).expand_as(cls_conf) #(batch, anchor_num, class_num) Ture or False inside
+        cls_pre = cls_conf[(cls_pos_expand+cls_neg_expand)>0] #[batch, anchor_num, class_num]
+        cls_pre = cls_pre.view(-1, self.class_num)#[batch*anchor, class_num]
+        cls_target = cls_t[(cls_pos+cls_neg)>0].view(-1) # (batch*anchor)
+        loss_c = F.cross_entrypy(cls_pre, cls_target, size_average=False)
+        N = pos_num.data.sum()
+        loss_c = loss_c / N
+        loss_l = loss_l / N
+        return loss_l, loss_c
 
 def box_match(thres, variance, box_gt, cls_gt, anchors, loc_t, cls_t, idx):
     """

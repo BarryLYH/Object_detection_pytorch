@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.autograd import Variable
 
 #__all__ = []
 
@@ -20,7 +21,8 @@ class MultiBoxLoss(nn.Module):
         #cls_conf: [batch_size, anchor_number, class_num] (batch_size, 8732, 21)
         #anchors: [8732, 4]
         #gt: ground truth, the location info of groud truth [batch_size, object_num, 5]
-        #    "object_num" is the number of objects in a image. "5" mean 4 loaction info + 1 class
+        #    "object_num" is the number of objects in a image. "5" mean 4 loaction info 
+        # [xmin, ymin, xmax, ymax] + 1 class
 
         loc, cls_conf, anchors = predictions
         batch_size = loc.size(0)

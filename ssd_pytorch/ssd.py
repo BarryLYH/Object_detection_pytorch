@@ -2,7 +2,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-
 class SSD(nn.Module):
     def __init__(self, phase = "train",class_num = 80):
         super(SSD, self).__init__()
@@ -11,7 +10,6 @@ class SSD(nn.Module):
         self.class_num = class_num
         self.backbone = VGG16(class_num = self.class_num)#output of this layer are 6 features
         self.predict = Predict(phase=self.phase, class_num = self.class_num)
-        
 
     def forward(self, x):
         features = self.backbone(x)
@@ -172,6 +170,3 @@ class VGG16(nn.Module):
 def ssd(**kwarg):
     model = SSD(**kwarg)
     return model
-
-    
-

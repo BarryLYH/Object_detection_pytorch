@@ -2,8 +2,10 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+__all__ = ["ssd"]
+
 class SSD(nn.Module):
-    def __init__(self, phase = "train",class_num = 80):
+    def __init__(self, phase = "train", class_num = 81):
         super(SSD, self).__init__()
         # Here asume the input size of image is 300*300*3
         self.phase = phase 
@@ -22,7 +24,7 @@ class SSD(nn.Module):
 
 
 class Predict(nn.Module):
-    def __init__(self, phase, class_num = 80):
+    def __init__(self, phase, class_num = 81):
         self.in_planes = [512, 1024, 512, 256, 256, 256]
         self.anchors = [4, 6, 6, 6, 4, 4]
         self.class_num = class_num + 1
@@ -64,7 +66,7 @@ class Predict(nn.Module):
         return loc, cls
 
 class VGG16(nn.Module):
-    def __init__(self, class_num = 80):
+    def __init__(self, class_num = 81):
         super(VGG16, self).__init__()
         # Here asume the input size of image is 300*300*3
         self.conv1 = nn.Sequential(

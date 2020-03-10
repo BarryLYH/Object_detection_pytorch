@@ -2,8 +2,9 @@ import torch
 import torch.nn as nn
 import numpy as np
 
-class AnchorBox(Object):
-    def __init__(self):
+class AnchorBox(object):
+    def __init__(self, use_gpu):
+        self.use_gpu = use_gpu
         #All these settings are based on ssd300 model
         self.image_size = 300
         self.feature_size = [38, 19, 10, 5, 3, 1] #the size of 6 output features
@@ -47,10 +48,12 @@ class AnchorBox(Object):
         #turn list in to tensor and resize it in (anchor_num, 4), here is (8732, 4)
         output = torch.Tensor(anchors)
         output = output.view(-1, 4)
+        if self.use_gpu:
+            output = output.cuda()
         return output
 
 
-class Detector(Object):
+class Detector(object):
     def __init__(self, class_num):
         self.threshold = 0.5
         self.top_k = 100

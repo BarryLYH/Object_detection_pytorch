@@ -1,6 +1,8 @@
 import json
 import pandas as pd
 
+#read coco val.json. Train data is too large, here i just want to show how ssd works
+
 with open("/Users/Barry/Desktop/annotations/instances_val2017.json", "r") as f:
     temp = json.loads(f.read())
 data = {}

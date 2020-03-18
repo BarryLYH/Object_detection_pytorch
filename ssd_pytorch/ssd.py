@@ -25,6 +25,7 @@ class SSD(nn.Module):
 
 class Predict(nn.Module):
     def __init__(self, phase, class_num = 81):
+        super(Predict, self).__init__()
         self.in_planes = [512, 1024, 512, 256, 256, 256]
         self.anchors = [4, 6, 6, 6, 4, 4]
         self.class_num = class_num + 1
@@ -47,8 +48,9 @@ class Predict(nn.Module):
         # boxes or classes
         # using contiguous to make sure all tensors are continuous in RAM and we can us view next
         for l, c in zip(loc, cls):
-             location.append(l.permute(0,2,3,1).contiguous())
-             clsconf.append(c.permute(0,2,3,1).contiguous())
+            print(l.size())
+            location.append(l.permute(0,2,3,1).contiguous())
+            clsconf.append(c.permute(0,2,3,1).contiguous())
         loc = torch.cat([o.view(o.size(0), -1) for o in location], 1)
         cls = torch.cat([o.view(o.size(0), -1) for o in clsconf], 1)
         #After above step, all the predictions will be concatenated. Before concatenating, the shapes
@@ -152,9 +154,9 @@ class VGG16(nn.Module):
         x = self.conv1(x)
         x = self.conv2(x)
         x = self.conv3(x)
-        x = self.conv4_3(x)
-        features.append(F.normalizex(x, p=2, dim=1, eps=1e-12)) #L2normalization in torch
-        x = self.maxpool4(x)
+        x = self.conv4(x)
+        features.append(F.normalize(x, p=2, dim=1, eps=1e-12)) #L2normalization in torch
+        x = self.maxpool4_3(x)
         x = self.conv5(x)
         x = self.conv6(x)
         x = self.conv7(x)

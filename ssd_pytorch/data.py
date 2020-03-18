@@ -3,6 +3,7 @@ import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 import torchvision.transforms as transforms
 from PIL import Image
+import numpy as np
 
 
 class Mydataset(Dataset):
@@ -24,11 +25,15 @@ class Mydataset(Dataset):
         image =  Image.open(path)
         #image = cv2.imread(path)
         image = self.transform(image)
+        print(len(labels))
+        labels = torch.Tensor(np.array(labels))
+        print(labels.size())
+    
         return image, labels
     def __len__(self):
         return len(self.data)
 
-def alexnet_transform():
+def ssd_transform():
     transform = transforms.Compose([
                                     transforms.Resize((300,300)),
                                     transforms.ToTensor(),

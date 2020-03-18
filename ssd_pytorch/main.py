@@ -3,6 +3,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 import argparse
 from torch.autograd import Variable
+from torch.utils.data import Dataset, DataLoader
+import torchvision.transforms as transforms
+from PIL import Image
 
 from ssd import *
 from data import * 
@@ -30,16 +33,16 @@ def main():
     cls_num = args.class_num
     use_gpu = torch.cuda.is_available()
     
-    model = ssd(class_num = cls_num+1)
+    model = ssd(class_num = cls_num + 1)
     
     if use_gpu:
         model = model.cuda()
         print("Use GPU")
     else:
         print("Use CPU")
-    criterion = MultiBoxLoss(use_gpu=use_gpu, )
-    trainset = Mydataset(data_path)
-    trainloader = Dataloader(
+    transform = ssd_transform()
+    trainset = Mydataset(data_path,transform)
+    trainloader = DataLoader(
         trainset, batch_size = 5, shuffle=True
     )
     anchors = AnchorBox(use_gpu).forward()
@@ -58,7 +61,8 @@ def main():
         for batch_index, (img, targets) in enumerate(trainloader):
             if use_gpu:
                 img, targets = img.cuda(), targets.cuda()
-            img, targets = Variable(img), Variable(img)
+            img, targets = Variable(img), Variable(targets)
+            print(targets.size())
             anc_box = Variable(anchors)
             loc, cls = model(img)
             loss_l, loss_c = criterion([loc, cls, anc_box], targets)

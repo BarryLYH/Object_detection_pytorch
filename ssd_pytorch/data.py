@@ -13,22 +13,25 @@ class Mydataset(Dataset):
         lines = input.readlines()
         input.close()
         data = []
+        self.maxbnum = 0
         for line in lines:
             line = line.strip()
             path = line.split()[0]
             labels = convert_label(line.split()[1:])
+            if len(labels) > self.maxbnum:
+                self.maxbnum = len(labels)
             data.append([path, labels])
         self.data = data
         self.transform = transform
+
     def __getitem__(self, index):
         path, labels = self.data[index]
         image =  Image.open(path)
         #image = cv2.imread(path)
         image = self.transform(image)
-        print(len(labels))
+        for i in range(self.maxbnum - len(labels)):
+            labels.append([-1, -1, -1, -1, -1])
         labels = torch.Tensor(np.array(labels))
-        print(labels.size())
-    
         return image, labels
     def __len__(self):
         return len(self.data)

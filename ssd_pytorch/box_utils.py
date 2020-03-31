@@ -13,7 +13,7 @@ class AnchorBox(object):
         # the first size 30 for feature 38*38 is a specific one. Details in paper
         self.min_size = [30, 60, 111, 162, 213, 264] 
         self.max_size = [60, 111, 162, 213, 264, 315] # anchor boxes
-        #the filter sizes. For instance, feature 38*38 is after filter 8 which is 300/8
+        # the filter sizes. For instance, feature 38*38 is after filter 8 which is 300/8
         # Since the cx, cy, w, h are the rate of image_size, we use this to help calculate.
         self.step = [8, 16, 32, 64, 100, 300] #the filter size
         
@@ -40,7 +40,7 @@ class AnchorBox(object):
                     anchors += [cx, cy, s_k2_h, s_k2_w]
                     anchors += [cx, cy, s_k2_w, s_k2_h]
                     # when there are 6 anchor boxes, we need w:h=1:3 and 3:1 trangles
-                    if self.anchor_num == 6:
+                    if self.anchor_num[k] == 6:
                         s_k3_h = s_k / np.sqrt(3)
                         s_k3_w = s_k * np.sqrt(3)
                         anchors += [cx, cy, s_k3_h, s_k3_w]

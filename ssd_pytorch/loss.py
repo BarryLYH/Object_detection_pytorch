@@ -36,7 +36,8 @@ class MultiBoxLoss(nn.Module):
             cls_gt = gt[idx][:,-1].data  #[object_num]
             default_anchors = anchors.data
             # loc_t, cls_t will change inside "box_match()"
-            box_match(self.iou_threshold, self.variance, box_gt, cls_gt, default_anchors, loc_t, cls_t, idx) 
+            use_len = findUsefulGT(cls_gt)
+            box_match(self.iou_threshold, self.variance, box_gt[:use_len,:], cls_gt[:use_len], default_anchors, loc_t, cls_t, idx) 
         if self.use_gpu:
             loc_t.cuda()
             cls_t.cuda()
@@ -45,11 +46,12 @@ class MultiBoxLoss(nn.Module):
         #find anchors whose classes are not background
         #cls_pos: the positive samples [batch_size, anchor_num]
         cls_pos = (cls_t > 0) 
+        
 
         # location loss function, use smoothL1 loss function
         # loc_t, loc: [batch_size, anchor_num ,4]
         # cls_pos:   [batch_size, anchor_num]
-        box_mask = cls_pos.unsqueeze(1).expand(batch_size, anchor_num, 4)
+        box_mask = cls_pos.unsqueeze(2).expand(batch_size, anchor_num, 4)
         loc_p = loc[box_mask].view(-1, 4) 
         loc_gt = loc_t[box_mask].view(-1, 4)
         loss_l = F.smooth_l1_loss(loc_p, loc_gt, reduction='mean')
@@ -59,11 +61,12 @@ class MultiBoxLoss(nn.Module):
         # cls_t: [batch, num_priors]
         cls_conf = cls_conf.view(-1, self.class_num) # (batch*8732, 21)
         # Do log(softmax([num_classes]))
-        cls_log = -torch.log(F.softmax(1, cls_conf)) 
+        cls_log = -torch.log(F.softmax(cls_conf, 1)) 
         # the prediction loss of anchor box. We get the prediction log(softmax)
         # of the expected class. This class's probability should be 1, after log(1)
         # it should be 0. so the distance is 0 - log(softmax[])
-        cls_b_loss = torch.gather(cls_log, 1, cls_t.view(-1, 1))
+
+        cls_b_loss = cls_log.gather(dim=1, index=cls_t.view(-1, 1))
         #mine the negative samples
         cls_b_loss[cls_pos.view(-1, 1)] = 0 # we turn all the positve samples' losses to 0
         cls_b_loss = cls_b_loss.view(batch_size, -1) # [batch*anchor, 1] -> [batch, anchors]
@@ -98,7 +101,7 @@ def box_match(thres, variance, box_gt, cls_gt, anchors, loc_t, cls_t, idx):
     cls_t: [batch_size, anchors_num](batc, 8732) the output of match boxes class
     idx: image index in batch_size of images"""
     # tranfer anchors from [cx,cy, w,h] to 4 points [xmin, ymin, xmax, ymax]
-    anchors_4p = torch.cat((anchors[:, :2]-anchors[:,2:]/2, anchors[:,:2]+anchors[:,2:]/2) ,1)
+    anchors_4p = torch.cat((anchors[:, :2]-anchors[:,2:]/2, anchors[:,:2]+anchors[:,2:]/2), 1)
     overlap = iou_jaccard(box_gt, anchors_4p)
     
     #get the large iou area value and the index of anchors
@@ -152,10 +155,9 @@ def iou_jaccard(box_t, box_a):
     overlap = torch.zeros(len_t, len_a)
     # calculate iou overlap area
     overlap[:,:] = box_wh[:,:,0] * box_wh[:,:,1] #[object_num, anchor_num]
-
-    #TODO iou = 
-    area_t = (box_t[:,2] - box_t[:,0]) * (box_t[:,3] - box_t[:,1]).unsqueeze(1).expand(overlap)
-    area_a = (box_a[:,2] - box_a[:,0]) * (box_a[:,3] - box_a[:,1]).unsqueeze(0).expand(overlap)
+    a, b = overlap.size()
+    area_t = ((box_t[:,2] - box_t[:,0]) * (box_t[:,3] - box_t[:,1])).unsqueeze(1).expand(a, b)
+    area_a = ((box_a[:,2] - box_a[:,0]) * (box_a[:,3] - box_a[:,1])).unsqueeze(0).expand(a, b)
     iou = overlap / (area_t + area_a - overlap)
     return iou
 
@@ -169,6 +171,8 @@ def encode(bow_match, anchors, variance):
     #g_wh: [anchor_num, 2]
     return torch.cat((g_xy, g_wh),1)
 
-
-
-
+def findUsefulGT(gt):
+    i = 0
+    while gt[i].item() > 0 :
+        i+=1
+    return i

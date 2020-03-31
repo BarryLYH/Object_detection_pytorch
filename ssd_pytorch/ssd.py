@@ -20,15 +20,17 @@ class SSD(nn.Module):
         # the final output is the predictions of each feature cells.
         # loc is the location predictions for each anchor box and 
         # cls is the class predictions for eahc anchor boxs
+        # loc is exoected to be (batch_size, 8732, 4)
+        # cls is expected to be (batch_size, 8732, class_num + 1(background))
         return loc, cls
 
 
 class Predict(nn.Module):
-    def __init__(self, phase, class_num = 81):
+    def __init__(self, phase, class_num):
         super(Predict, self).__init__()
         self.in_planes = [512, 1024, 512, 256, 256, 256]
         self.anchors = [4, 6, 6, 6, 4, 4]
-        self.class_num = class_num + 1
+        self.class_num = class_num
         self.phase = phase
         self.softmax = nn.Softmax(-1)
 
@@ -37,19 +39,21 @@ class Predict(nn.Module):
         cls = []
         # the default shape of pytorch is (N, C, H ,W) and in this case it is 
         # (batch_size, box_loaction, feature_height, feature_width). For instance,
-        # if is feature 38*38*(4*4), the ourput will be (batch_size, 4*4, 38, 38) 
+        # if is feature 38*38*(4*4), the output will be (batch_size, 4*4, 38, 38).
+        # Here 4*4 mean this cell has 4 anchors and the other "4" is the 
+        # box location.
         for i,f in enumerate(features):
-            loc.append(nn.Conv2d(self.in_planes[i], self.anchors[i]*4, 3, 1, 1))
-            cls.append(nn.Conv2d(self.in_planes[i], self.anchors[i]*self.class_num+1, 3, 1, 1))
+            loc.append(nn.Conv2d(self.in_planes[i], self.anchors[i]*4, 3, 1, 1)(f))
+            cls.append(nn.Conv2d(self.in_planes[i], self.anchors[i]*self.class_num, 3, 1, 1)(f))
 
         location = []
         clsconf = []
         # This step will change (N, C, H, W) to (N, H, W, C) so that we can easily concatenate all
         # boxes or classes
         # using contiguous to make sure all tensors are continuous in RAM and we can us view next
-        for l, c in zip(loc, cls):
-            print(l.size())
+        for l in loc:
             location.append(l.permute(0,2,3,1).contiguous())
+        for c in cls:
             clsconf.append(c.permute(0,2,3,1).contiguous())
         loc = torch.cat([o.view(o.size(0), -1) for o in location], 1)
         cls = torch.cat([o.view(o.size(0), -1) for o in clsconf], 1)
@@ -61,7 +65,7 @@ class Predict(nn.Module):
         # which are (batch_size, 8732, 4) and (batch_size, 8732, 81)
         loc = loc.view(loc.size(0), -1, 4)
         cls = cls.view(cls.size(0), -1, self.class_num)
-        
+
         if self.phase == "test":
             cls = self.softmax(cls)            
 
@@ -92,7 +96,7 @@ class VGG16(nn.Module):
             nn.ReLU(inplace=True),
             nn.Conv2d(256, 256, 3, 1, 1), #75*75*256
             nn.ReLU(inplace=True),
-            nn.MaxPool2d(2, 2) #38*38*256, maxpool3
+            nn.MaxPool2d(2, 2, 1) #38*38*256, maxpool3
         )
         self.conv4 = nn.Sequential(
             nn.Conv2d(256, 512, 3, 1, 1), #38*38*512

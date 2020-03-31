@@ -46,7 +46,6 @@ def main():
         trainset, batch_size = 5, shuffle=True
     )
     anchors = AnchorBox(use_gpu).forward()
-
     criterion = MultiBoxLoss(
                         use_gpu = use_gpu, 
                         iou_threshold = 0.5, 
@@ -62,7 +61,6 @@ def main():
             if use_gpu:
                 img, targets = img.cuda(), targets.cuda()
             img, targets = Variable(img), Variable(targets)
-            print(targets.size())
             anc_box = Variable(anchors)
             loc, cls = model(img)
             loss_l, loss_c = criterion([loc, cls, anc_box], targets)

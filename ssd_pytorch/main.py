@@ -58,6 +58,7 @@ def main():
     for step in range(epoch):
         model.train()
         for batch_index, (img, targets) in enumerate(trainloader):
+            optimizer.zero_grad()
             if use_gpu:
                 img, targets = img.cuda(), targets.cuda()
             img, targets = Variable(img), Variable(targets)

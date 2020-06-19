@@ -50,7 +50,7 @@ class Predict(nn.Module):
         clsconf = []
         # This step will change (N, C, H, W) to (N, H, W, C) so that we can easily concatenate all
         # boxes or classes
-        # using contiguous to make sure all tensors are continuous in RAM and we can us view next
+        # using contiguous to make sure all tensors are continuous in RAM and we can use view next
         for l in loc:
             location.append(l.permute(0,2,3,1).contiguous())
         for c in cls:

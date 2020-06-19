@@ -171,6 +171,9 @@ def encode(bow_match, anchors, variance):
     #g_wh: [anchor_num, 2]
     return torch.cat((g_xy, g_wh),1)
 
+
+# The number of boxes in ground truth are different. Thus, I use [-1,-1,-1,-1] to 
+# fillful the grounf truth so that they can have same shape. 
 def findUsefulGT(gt):
     i = 0
     while gt[i].item() > 0 :
